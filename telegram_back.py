@@ -143,14 +143,63 @@ async def option3_proc(message):
     await message.answer("Эта функция появится позже", reply_markup=markup)
 
 async def make_concl(message, state):
+    markup = make_answer_buttons([
+        'Ok',
+                            ])
+
+    threshold = 0.3
     user_data = await state.get_data() 
     tourn_id = int(user_data.get("tourn_id")) 
     team_id = int(user_data.get("team_id"))
-    res_df, epics_df, prod_df = chst.make_team_result(tourn_id, team_id)
+
+    try:
+        tourn_df, question_df, players_df = chst.get_tourn_result(tourn_id)
+        await message.answer("Турнир в базе найден")
+    except Exception as e:
+        print(str(e))
+        await message.answer("Кажется, с турниром есть какая-то ошибка", reply_markup=markup)
+
+    try:
+        question_df = question_df.merge(tourn_df, 'left', on=['tourn_id', 'team_id'])
+        qv_df = chst.tourn_stat(question_df)
+        qv_stat = chst.diff_stat(qv_df)
+        await message.answer("Расплюсовка турнира загружена", reply_markup=markup)
+    except Exception as e:
+        print(str(e))
+        await message.answer("Кажется, расплюсовки у турнира ещё нет", reply_markup=markup)
+
+    try:
+        res_df = qv_stat[
+                        (qv_stat['team_id'] == team_id) &
+                        (qv_stat['from_expected'] > threshold)
+                        ].sort_values(by='from_expected', ascending=False)
+    except Exception as e:
+        print(str(e))
+        await message.answer("Кажется, команда не играла выбранный вами турнир", reply_markup=markup)
+
+    if len(res_df) == 0:
+         await message.answer("Кажется, команда не играла выбранный вами турнир", reply_markup=markup)
+
+    res_df['difficulty'] = np.round(res_df['difficulty'], 2)
+    res_df['from_expected'] = np.round(res_df['from_expected'], 2)
+    epics_df = res_df[
+                        res_df['qv_result'] == 1
+                    ][[
+                        'team_name', 
+                        'question_num', 'difficulty', 'from_expected'
+                    ]].set_index('team_name')
+    
+    prod_df = res_df[
+                        res_df['qv_result'] == 0
+                    ][[
+                        'team_name', 
+                        'question_num', 'difficulty', 'from_expected'
+                    ]].set_index('team_name')
+
     res_str, pdod_str, epic_str = chst.make_strs(res_df, epics_df, prod_df)
     await message.answer(res_str)
     await message.answer(pdod_str)
-    await message.answer(epic_str)
+    await message.answer(epic_str, reply_markup=markup)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
