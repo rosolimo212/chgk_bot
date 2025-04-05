@@ -166,7 +166,38 @@ def get_tourn_list(date_start: str, date_end: str, page: int):
 
     return torun_list_df
 
- 
+
+def get_team_name(team_id):
+    headers = {
+        'accept': 'application/json',
+    }
+    params = {}
+
+    response = requests.get('https://api.rating.chgk.net/teams/' + str(team_id), params=params, headers=headers)
+
+    res = ''
+    if response.status_code == 200:
+        res = response.json()['name']
+    else:
+        res = response.json()['description']
+    return res
+
+def get_tournament_name(tourn_id):
+    headers = {
+        'accept': 'application/json',
+    }
+    params = {}
+
+    response = requests.get('https://api.rating.chgk.net/tournaments/' + str(tourn_id), params=params, headers=headers)
+
+    res = 'Турнир не найден'
+    if response.status_code == 200:
+        res = response.json()['name']
+    else:
+        res = response.json()['description']
+    return res
+
+
 def qv_from_mask(mask:str):
     """
     Функция делает из строки с расплюсовкой массив с результатами одной конкретной команды
